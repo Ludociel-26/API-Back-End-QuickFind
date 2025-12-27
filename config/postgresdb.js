@@ -6,7 +6,13 @@ console.log("🔍 Cargando configuración de Sequelize...");
 
 const sequelize = new Sequelize(process.env.POSTGRES_URI, {
     dialect: 'postgres',
-    logging: false, // Puedes habilitar el logging si lo deseas
+    logging: false,
+    dialectOptions: {
+        ssl: {
+            require: true, // ESTO GARANTIZA LA ENCRIPTACIÓN
+            rejectUnauthorized: false // Permite certificados autofirmados de AWS
+        }
+    }
 });
 
 console.log("✅ Sequelize inicializado correctamente.");
