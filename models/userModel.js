@@ -1,14 +1,39 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/postgresdb.js';
-import Role from './role.js';
-import NivelFidelizacion from './nivelFidelizacion.js';
+import Role from './userRole.js';
+import levelArea from './levelArea.js';
 
 const User = sequelize.define('User', {
+    // 1. BLOQUE DE IDENTIDAD (Llaves Primarias y Públicas)
     id: {
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
+    },// RECOMENDACIÓN: Agrega un UUID. 
+    // No expongas el ID numérico (1, 2, 3) en la API pública por seguridad.
+
+    // 2. BLOQUE DE CREDENCIALES Y ACCESO (Lo más crítico)
+    email: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,  // Garantiza que los correos sean únicos
     },
+    password: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    rol_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1  // Valor por defecto
+    },
+    area_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null
+    },
+
+    // 3. BLOQUE DE PERFIL (Información)
     name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -25,28 +50,22 @@ const User = sequelize.define('User', {
         type: DataTypes.DATE,
         allowNull: false,
     },
-    email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,  // Garantiza que los correos sean únicos
+
+    // 4. BLOQUE DE ESTADO (Flags de Control)
+    is_account_verified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
     },
-    password: {
-        type: DataTypes.STRING,
-        allowNull: false,
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        comment: 'Interruptor general para "bannear" o desactivar usuarios sin borrarlos'
     },
-    phone_lada: {
+
+    // 5. BLOQUE DE SISTEMA / TEMPORALES (Al final, "ruido" visual)
+    auth_token: {
         type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-            is: /^\+(\d{1,4})$/,
-        },
-    },
-    phone_number: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-            is: /^\d{10}$/,
-        },
+        allowNull: true,
     },
     verify_otp: {
         type: DataTypes.STRING,
@@ -56,10 +75,6 @@ const User = sequelize.define('User', {
         type: DataTypes.BIGINT,
         defaultValue: 0,
     },
-    is_account_verified: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-    },
     reset_otp: {
         type: DataTypes.STRING,
         defaultValue: '',
@@ -68,25 +83,11 @@ const User = sequelize.define('User', {
         type: DataTypes.BIGINT,
         defaultValue: 0,
     },
-    auth_token: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    rol_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 1  // Valor por defecto
-    },
-    nivel_fidelizacion_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: null
-    }
 });
 
 // Relaciones
 User.belongsTo(Role, { foreignKey: 'rol_id'});
-User.belongsTo(NivelFidelizacion, { foreignKey: 'nivel_fidelizacion_id'});
+User.belongsTo(levelArea, { foreignKey: 'area_id'});
 
 export default User;
 

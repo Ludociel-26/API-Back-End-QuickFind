@@ -7,8 +7,8 @@ import logger from '../logger.js';
 
 // Registro de usuario
 export const register = async (req, res) => {
-    const { name, surname, country, birth_date, email, password, phone_lada, phone_number } = req.body;
-    if (!name || !surname || !country || !birth_date || !email || !password || !phone_lada || !phone_number) {
+    const {email, password, name, surname, country, birth_date} = req.body;
+    if (!email || !password || !name || !surname || !country || !birth_date) {
         return res.json({ success: false, message: 'Missing Details' });
     }
     try {
@@ -18,24 +18,16 @@ export const register = async (req, res) => {
         return res.json({ success: false, message: "User already exists" });
     }
 
-    // Verifica si el número de teléfono ya está en uso
-    const existingUserByPhone = await User.findOne({ where: { phone_number } });
-    if (existingUserByPhone) {
-        return res.json({ success: false, message: "Phone number is already in use. Please try again." });
-    }
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({ 
-        name, 
-        surname, 
-        country, 
-        birth_date, 
-        email, 
-        password: hashedPassword, 
-        phone_lada, 
-        phone_number,
-        rol_id: 1  // Asigna el rol por defecto
+    const user = await User.create({
+        email,
+        password: hashedPassword,
+        rol_id: 1,  // Asigna el rol por defecto
+        name,
+        surname,
+        country,
+        birth_date
     });
 
     // Genera el token JWT
@@ -56,9 +48,9 @@ export const register = async (req, res) => {
 
     // Enviar correo de bienvenida
     const mailOptions = {
-        from: `"🏨HotelBits" <${process.env.SENDER_EMAIL}>`,
+        from: `"👁️‍🗨️OmniPartVision" <${process.env.SENDER_EMAIL}>`,
         to: email,
-        subject: '✨ Te damos la bienvenida a HotelBits 🏨',
+        subject: '✨ Te damos la bienvenida a OmniPartVision 👁️‍🗨️',
         // text: `Welcome to Hotel website. Your account has been created with email id: ${email}`,
         html: EMAIL_WELCOME_TEMPLATE.replace("{{name}}", user.name).replace("{{email}}", user.email)
     };
@@ -155,7 +147,7 @@ export const sendVerifyOtp = async (req, res) => {
         // Enviar correo para validar correo por OTP
         await user.save();
         const mailOption = {
-            from: `"✉️ Verifica email de contacto en 🏨HotelBits"<${process.env.SENDER_EMAIL}>`,
+            from: `"✉️ Verifica email de contacto en 👁️‍🗨️OmniPartVision"<${process.env.SENDER_EMAIL}>`,
             to: user.email,
             subject: '🔐 Protege tu cuenta: verifica tu email ahora',
             // text: `Your OTP is ${otp}. Verify your account using this OTP.`,
@@ -235,7 +227,7 @@ export const sendResetOtp = async (req, res) => {
         await user.save();
 
         const mailOption = {
-            from: `"Solicitud de restablecimiento de contraseña de tu cuenta de 🏨HotelBits"<${process.env.SENDER_EMAIL}>`,
+            from: `"Solicitud de restablecimiento de contraseña de tu cuenta de 👁️‍🗨️OmniPartVision"<${process.env.SENDER_EMAIL}>`,
             to: user.email,
             subject: 'Cambia tu contraseña de forma segura',
             // text: `Your OTP for resetting your password is ${otp}. Use this OTP to proceed with resetting your password.`

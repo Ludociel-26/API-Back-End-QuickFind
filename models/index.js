@@ -1,3 +1,3 @@
-import './role.js';
-import './nivelFidelizacion.js';
+import './userRole.js';
+import './levelArea.js';
 import './userModel.js';
