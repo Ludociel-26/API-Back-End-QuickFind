@@ -4,90 +4,90 @@ import Role from './userRole.js';
 import levelArea from './levelArea.js';
 
 const User = sequelize.define('User', {
-    // 1. BLOQUE DE IDENTIDAD (Llaves Primarias y Públicas)
-    id: {
-        type: DataTypes.BIGINT,
-        autoIncrement: true,
-        primaryKey: true,
-    },// RECOMENDACIÓN: Agrega un UUID. 
-    // No expongas el ID numérico (1, 2, 3) en la API pública por seguridad.
+  // 1. BLOQUE DE IDENTIDAD (Llaves Primarias y Públicas)
+  id: {
+    type: DataTypes.BIGINT,
+    autoIncrement: true,
+    primaryKey: true,
+  },
 
-    // 2. BLOQUE DE CREDENCIALES Y ACCESO (Lo más crítico)
-    email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,  // Garantiza que los correos sean únicos
-    },
-    password: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    rol_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 1  // Valor por defecto
-    },
-    area_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: null
-    },
+  // 2. BLOQUE DE CREDENCIALES Y ACCESO (Lo más crítico)
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true, // Garantiza que los correos sean únicos
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  rol_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1, // Valor por defecto
+  },
+  area_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 9, // Valor por defecto
+  },
 
-    // 3. BLOQUE DE PERFIL (Información)
-    name: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    surname: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    country: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    birth_date: {
-        type: DataTypes.DATE,
-        allowNull: false,
-    },
+  // 3. BLOQUE DE PERFIL (Información)
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  surname: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  country: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  birth_date: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
 
-    // 4. BLOQUE DE ESTADO (Flags de Control)
-    is_account_verified: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-    },
-    is_active: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-        comment: 'Interruptor general para "bannear" o desactivar usuarios sin borrarlos'
-    },
+  // 4. BLOQUE DE ESTADO (Flags de Control)
+  is_account_verified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    comment:
+      'Interruptor general para "bannear" o desactivar usuarios sin borrarlos',
+  },
 
-    // 5. BLOQUE DE SISTEMA / TEMPORALES (Al final, "ruido" visual)
-    auth_token: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    verify_otp: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    verify_otp_expire_at: {
-        type: DataTypes.BIGINT,
-        defaultValue: 0,
-    },
-    reset_otp: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    reset_otp_expire_at: {
-        type: DataTypes.BIGINT,
-        defaultValue: 0,
-    },
+  // 5. BLOQUE DE SISTEMA / TEMPORALES (Al final, "ruido" visual)
+  auth_token: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  verify_otp: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  verify_otp_expire_at: {
+    type: DataTypes.BIGINT,
+    defaultValue: 0,
+  },
+  reset_otp: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  reset_otp_expire_at: {
+    type: DataTypes.BIGINT,
+    defaultValue: 0,
+  },
 });
 
 // Relaciones
-User.belongsTo(Role, { foreignKey: 'rol_id'});
-User.belongsTo(levelArea, { foreignKey: 'area_id'});
+User.belongsTo(Role, { foreignKey: 'rol_id' });
+User.belongsTo(levelArea, { foreignKey: 'area_id' });
 
 export default User;
 
