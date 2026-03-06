@@ -1,4 +1,5 @@
-import { User as userModel, Role, LevelArea } from '../models/index.js';
+import jwt from 'jsonwebtoken';
+import { User, Role, LevelArea } from '../models/index.js';
 
 // =======================================================================
 // 1. OBTENER DATOS DEL USUARIO LOGUEADO (Navbar / Sesión)
@@ -13,19 +14,11 @@ export const getUserData = async (req, res) => {
         .json({ success: false, message: 'User ID not found' });
     }
 
-    const user = await userModel.findOne({
+    const user = await User.findOne({
       where: { id: Number(userId) },
       include: [
-        {
-          model: Role,
-          as: 'roleDetail',
-          attributes: ['name'],
-        },
-        {
-          model: LevelArea,
-          as: 'areaDetail',
-          attributes: ['level'],
-        },
+        { model: Role, as: 'roleDetail', attributes: ['name'] },
+        { model: LevelArea, as: 'areaDetail', attributes: ['level'] },
       ],
     });
 
@@ -35,7 +28,6 @@ export const getUserData = async (req, res) => {
         .json({ success: false, message: 'User not found' });
     }
 
-    // Estructura ORDENADA específicamente como la pediste:
     return res.json({
       success: true,
       userData: {
@@ -43,12 +35,8 @@ export const getUserData = async (req, res) => {
         name: user.name,
         email: user.email,
         isAccountVerified: user.is_account_verified,
-
-        // --- GRUPO ROL (ID + Nombre) ---
         role: user.rol_id,
         roleName: user.roleDetail ? user.roleDetail.name : 'Sin Rol',
-
-        // --- GRUPO ÁREA (ID + Nombre) ---
         area: user.area_id,
         areaName: user.areaDetail ? user.areaDetail.level : 'Sin Área',
       },
@@ -64,7 +52,7 @@ export const getUserData = async (req, res) => {
 // =======================================================================
 export const getAllUsers = async (req, res) => {
   try {
-    const rawUsers = await userModel.findAll({
+    const rawUsers = await User.findAll({
       attributes: [
         'id',
         'email',
@@ -84,20 +72,13 @@ export const getAllUsers = async (req, res) => {
       order: [['id', 'ASC']],
     });
 
-    // Mapeo para garantizar el orden de las propiedades en el JSON de respuesta
     const users = rawUsers.map((user) => ({
       id: user.id,
       email: user.email,
-
-      // Grupo Rol
       rol_id: user.rol_id,
       role_name: user.roleDetail ? user.roleDetail.name : null,
-
-      // Grupo Área
       area_id: user.area_id,
       area_level: user.areaDetail ? user.areaDetail.level : null,
-
-      // Resto de datos
       name: user.name,
       surname: user.surname,
       country: user.country,
@@ -106,10 +87,7 @@ export const getAllUsers = async (req, res) => {
       is_active: user.is_active,
     }));
 
-    return res.status(200).json({
-      success: true,
-      users,
-    });
+    return res.status(200).json({ success: true, users });
   } catch (error) {
     console.error('Error en getAllUsers:', error);
     return res
@@ -125,7 +103,7 @@ export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const user = await userModel.findOne({
+    const user = await User.findOne({
       where: { id: Number(id) },
       attributes: { exclude: ['password'] },
       include: [
@@ -140,17 +118,14 @@ export const getUserById = async (req, res) => {
         .json({ success: false, message: 'Usuario no encontrado' });
     }
 
-    return res.json({
-      success: true,
-      user,
-    });
+    return res.json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // =======================================================================
-// 4. ACTUALIZAR USUARIO
+// 4. ACTUALIZAR USUARIO (CON CAPA DE SEGURIDAD PARA ROLES)
 // =======================================================================
 export const updateUser = async (req, res) => {
   try {
@@ -167,12 +142,42 @@ export const updateUser = async (req, res) => {
       birth_date,
     } = req.body;
 
-    const user = await userModel.findByPk(id);
+    const user = await User.findByPk(id);
     if (!user)
       return res
         .status(404)
         .json({ success: false, message: 'Usuario no encontrado' });
 
+    // ==========================================
+    // 🔒 CAPA DE SEGURIDAD: CONTROL DE PRIVILEGIOS
+    // ==========================================
+    // Si la petición intenta cambiar el ROL o el ÁREA, verificamos si es Admin
+    if (rol_id !== undefined || area_id !== undefined) {
+      let isAdmin = false;
+      const token = req.cookies.token;
+
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          if (decoded.role === 3) {
+            isAdmin = true;
+          }
+        } catch (err) {
+          // Token inválido o expirado
+        }
+      }
+
+      // Si intentan modificar campos críticos y NO son Admin, bloqueamos la acción.
+      if (!isAdmin) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Acceso Denegado: No tienes permisos de Administrador para modificar roles o áreas.',
+        });
+      }
+    }
+
+    // Si pasó la seguridad, aplicamos los cambios
     if (name !== undefined) user.name = name;
     if (surname !== undefined) user.surname = surname;
     if (email !== undefined) user.email = email;
@@ -186,10 +191,9 @@ export const updateUser = async (req, res) => {
 
     await user.save();
 
-    return res.status(200).json({
-      success: true,
-      message: 'Usuario actualizado correctamente',
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Usuario actualizado correctamente' });
   } catch (error) {
     console.error('Error en updateUser:', error);
     return res
@@ -206,15 +210,13 @@ export const deleteUser = async (req, res) => {
     const { id } = req.params;
 
     if (Number(id) === req.userID) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'No puedes eliminar tu propia cuenta.',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'No puedes eliminar tu propia cuenta.',
+      });
     }
 
-    const user = await userModel.findByPk(id);
+    const user = await User.findByPk(id);
     if (!user)
       return res
         .status(404)

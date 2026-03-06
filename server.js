@@ -7,110 +7,191 @@ import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 
 // Importaciones de los módulos path
-import path from 'path'; // Módulo para manejar rutas de archivos y directorios
-import { fileURLToPath } from 'url'; // Convierte una URL de módulo en una ruta de archivo
-import { dirname } from 'path'; // Obtiene el directorio de un archivo a partir de su ruta
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 import connectDB, { sequelize } from './config/postgresdb.js';
-// Routes Users
+
+// Routes
 import authRouter from './routes/authRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import roleRouter from './routes/roleRoutes.js';
+import levelAreaRouter from './routes/levelAreaRoutes.js';
 
 import logger from './logger.js';
 
-// Obtener la ruta absoluta del archivo actual
-const __filename = fileURLToPath(import.meta.url); // Convierte URL del módulo actual en una ruta de archivo
-const __dirname = dirname(__filename); // Obtiene el directorio donde se encuentra este archivo
+// =======================================================================
+// 🚩 1. CONFIGURACIÓN DE RUTAS ABSOLUTAS (__dirname en ES Modules)
+// =======================================================================
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 4000;
 
-// Conectar a la base de datos y sincronizar modelos
-connectDB().then(() => {
-  sequelize.sync(); // Llamar a sync() en la instancia sequelize, no en la clase Sequelize
-  console.log('Database synced');
-});
+// =======================================================================
+// 🚩 2. TRUST PROXY (IMPORTANTE PARA AWS / NGINX / LOAD BALANCER)
+// =======================================================================
+// Permite que Express obtenga correctamente la IP real del cliente
+// cuando se usa un proxy o balanceador (muy común en AWS EC2)
 
-const allowedOrigins = ['http://localhost:5173'];
+app.set('trust proxy', 1);
+
+// =======================================================================
+// 🚩 3. CONFIGURACIÓN DE SEGURIDAD CON HELMET
+// =======================================================================
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+
+// =======================================================================
+// 🚩 4. MIDDLEWARES DE PARSEO
+// =======================================================================
 
 app.use(express.json());
-app.use(bodyParser.json()); // Asegura que el cuerpo de la solicitud sea JSON
+app.use(bodyParser.json());
 app.use(cookieParser());
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-// ✅ Helmet para seguridad HTTP
-app.use(helmet());
 
-// Lista para almacenar IPs bloqueadas
-const blockedIPs = new Set();
+// =======================================================================
+// 🚩 5. CONFIGURACIÓN DE CORS (DESDE .env)
+// =======================================================================
 
-// Función para obtener la IP real del usuario y normalizar IPv6 a IPv4
+// Convertimos la variable del .env en array
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((url) => url.trim())
+  : [];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Permitir requests sin origin (postman, curl, apps móviles)
+      if (!origin) return callback(null, true);
+
+      // Si el origin está permitido
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Si no está permitido
+      console.log(`❌ CORS bloqueado para: ${origin}`);
+      return callback(new Error('Bloqueado por CORS'));
+    },
+
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-forwarded-for'],
+  }),
+);
+
+// =======================================================================
+// 🚩 6. RATE LIMITING (PROTECCIÓN CONTRA ATAQUES)
+// =======================================================================
+
 const getClientIP = (req) => {
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  if (ip.includes(',')) ip = ip.split(',')[0]; // En caso de múltiples IPs en X-Forwarded-For
-  return ip.replace(/^::ffff:/, ''); // Convierte IPv6 a IPv4
+
+  if (ip && ip.includes(',')) ip = ip.split(',')[0];
+
+  return ip?.replace(/^::ffff:/, '');
 };
 
-// Middleware para bloquear IPs
-app.use((req, res, next) => {
-  const ip = getClientIP(req);
-  if (blockedIPs.has(ip)) {
-    logger.warn(`⛔ Bloqueo de solicitud de IP: ${ip}`);
-    return res
-      .status(403)
-      .json({ success: false, message: 'Acceso denegado.' });
-  }
-  next();
-});
-
-// ✅ express-rate-limit para limitar solicitudes
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minuto
-  max: 150, // Máximo 150 solicitudes por IP
-  handler: (req, res) => {
-    const ip = getClientIP(req);
-    blockedIPs.add(ip); // Agrega la IP a la lista de bloqueadas
-    logger.warn(`⚠️ IP bloqueada por exceso de solicitudes: ${ip}`);
-    res
-      .status(429)
-      .json({
-        success: false,
-        message: 'Demasiadas solicitudes, intente más tarde.',
-      });
-  },
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 300, // máximo 300 requests por IP
   standardHeaders: true,
   legacyHeaders: false,
+
+  handler: (req, res) => {
+    const ip = getClientIP(req);
+
+    logger.warn(`⚠️ IP bloqueada temporalmente por exceso de requests: ${ip}`);
+
+    res.status(429).json({
+      success: false,
+      message:
+        'Demasiadas solicitudes al servidor. Intente nuevamente en unos minutos.',
+    });
+  },
 });
 
-app.use(limiter); // ✅ Aplica el límite a TODAS las rutas
+app.use(limiter);
 
-// Middleware para errores de JSON mal formateado
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    console.log('Invalid JSON format');
-    return res
-      .status(400)
-      .json({ success: false, message: 'Invalid JSON format' });
-  }
-  next();
-});
+// =======================================================================
+// 🚩 7. SERVIR ARCHIVOS ESTÁTICOS
+// =======================================================================
 
-// Servir archivos estáticos desde la carpeta 'assets'
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
-// API Endpoints Users
-app.get('/', (req, res) => res.send('API Working fine'));
+// =======================================================================
+// 🚩 8. RUTAS DE LA API
+// =======================================================================
+
+app.get('/', (req, res) => {
+  res.send('API Working fine');
+});
+
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/roles', roleRouter);
+app.use('/api/levelArea', levelAreaRouter);
 
-app.listen(port, () => logger.info(`🚀 Server started on PORT:${port}`));
+// =======================================================================
+// 🚩 9. MANEJO DE ERRORES DE JSON
+// =======================================================================
 
-// Manejo de rutas no encontradas
-app.use((req, res) => {
-  res
-    .status(404)
-    .json({
-      message: `No se encontró la ruta: ${req.method} ${req.originalUrl}`,
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.log('❌ Invalid JSON format');
+
+    return res.status(400).json({
+      success: false,
+      message: 'Formato JSON inválido',
     });
+  }
+
+  next();
 });
+
+// =======================================================================
+// 🚩 10. RUTA 404 (SI NO EXISTE LA RUTA)
+// =======================================================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    message: `No se encontró la ruta: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// =======================================================================
+// 🚩 11. INICIAR SERVIDOR SOLO CUANDO LA DB ESTÉ LISTA
+// =======================================================================
+// Esto evita que la API arranque si PostgreSQL falla
+
+const startServer = async () => {
+  try {
+    console.log('🔍 Conectando a la base de datos...');
+
+    await connectDB();
+
+    console.log('✅ Base de datos conectada');
+
+    await sequelize.sync();
+
+    console.log('✅ Modelos sincronizados');
+
+    app.listen(port, () => {
+      logger.info(`🚀 Server started on PORT:${port}`);
+    });
+  } catch (error) {
+    console.error('❌ Error iniciando servidor:', error);
+
+    process.exit(1);
+  }
+};
+
+startServer();

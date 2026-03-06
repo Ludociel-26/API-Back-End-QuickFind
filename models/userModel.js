@@ -1,21 +1,16 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/postgresdb.js';
-import Role from './userRole.js';
-import levelArea from './levelArea.js';
 
 const User = sequelize.define('User', {
-  // 1. BLOQUE DE IDENTIDAD (Llaves Primarias y Públicas)
   id: {
     type: DataTypes.BIGINT,
     autoIncrement: true,
     primaryKey: true,
   },
-
-  // 2. BLOQUE DE CREDENCIALES Y ACCESO (Lo más crítico)
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true, // Garantiza que los correos sean únicos
+    unique: true,
   },
   password: {
     type: DataTypes.STRING,
@@ -24,22 +19,20 @@ const User = sequelize.define('User', {
   rol_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    defaultValue: 1, // Valor por defecto
+    defaultValue: 1,
   },
   area_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 9, // Valor por defecto
+    defaultValue: 9,
   },
-
-  // 3. BLOQUE DE PERFIL (Información)
   name: {
     type: DataTypes.STRING,
     allowNull: false,
   },
   surname: {
     type: DataTypes.STRING,
-    allowNull: false, // Permite que esté vacío cambiar a true
+    allowNull: true, // Cambiado a true según tu comentario
   },
   country: {
     type: DataTypes.STRING,
@@ -49,8 +42,6 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: false,
   },
-
-  // 4. BLOQUE DE ESTADO (Flags de Control)
   is_account_verified: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
@@ -61,8 +52,6 @@ const User = sequelize.define('User', {
     comment:
       'Interruptor general para "bannear" o desactivar usuarios sin borrarlos',
   },
-
-  // 5. BLOQUE DE SISTEMA / TEMPORALES (Al final, "ruido" visual)
   auth_token: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -85,9 +74,7 @@ const User = sequelize.define('User', {
   },
 });
 
-// Relaciones
-User.belongsTo(Role, { foreignKey: 'rol_id' });
-User.belongsTo(levelArea, { foreignKey: 'area_id' });
+// ⚠️ CERO RELACIONES AQUÍ. Mantén este archivo limpio.
 
 export default User;
 

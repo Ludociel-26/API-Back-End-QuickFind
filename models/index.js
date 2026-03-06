@@ -1,32 +1,30 @@
 import { sequelize } from '../config/postgresdb.js';
 
-// Importamos los modelos (asegúrate de que las rutas sean correctas)
+// Importamos los modelos limpios
 import User from './userModel.js';
-import Role from './userRole.js'; // Archivo userRole.js exporta Role
-import LevelArea from './levelArea.js'; // Archivo levelArea.js exporta levelArea
+import Role from './userRole.js'; // Con la extensión .js correcta
+import LevelArea from './levelArea.js'; // Con la extensión .js correcta
 
 // ==========================================
-// DEFINICIÓN DE ASOCIACIONES (RELACIONES)
+// DEFINICIÓN DE ASOCIACIONES (LOS SUBÍNDICES)
 // ==========================================
 
 // 1. Un Usuario pertenece a un Rol
 User.belongsTo(Role, {
-  foreignKey: 'rol_id', // El campo en la tabla Users
-  as: 'roleDetail', // Alias para acceder a los datos (ej: user.roleDetail.name)
+  foreignKey: 'rol_id',
+  as: 'roleDetail', // CORREGIDO: Escrito exactamente igual que en el controlador (con 'e')
 });
 
-// 2. Un Usuario pertenece a un Area (LevelArea)
+// 2. Un Usuario pertenece a un Area
 User.belongsTo(LevelArea, {
-  foreignKey: 'area_id', // El campo en la tabla Users
-  as: 'areaDetail', // Alias para acceder a los datos
+  foreignKey: 'area_id',
+  as: 'areaDetail', // Escrito exactamente igual que en el controlador
 });
 
-// Opcional: Definir la inversa (si alguna vez necesitas "Todos los usuarios de un rol")
-Role.hasMany(User, { foreignKey: 'rol_id' });
-LevelArea.hasMany(User, { foreignKey: 'area_id' });
+// Buenas prácticas: Definir también las relaciones inversas
+// (Por si en el futuro quieres buscar "Todos los usuarios que tienen el rol de Admin")
+Role.hasMany(User, { foreignKey: 'rol_id', as: 'usuarios' });
+LevelArea.hasMany(User, { foreignKey: 'area_id', as: 'usuarios' });
 
-// Sincronización (Opcional, ten cuidado en producción con {alter: true})
-// await sequelize.sync({ alter: true });
-
-// Exportamos los modelos con sus relaciones ya configuradas
-export { User, Role, LevelArea };
+// Exportamos la instancia de sequelize y los modelos ya relacionados
+export { sequelize, User, Role, LevelArea };
